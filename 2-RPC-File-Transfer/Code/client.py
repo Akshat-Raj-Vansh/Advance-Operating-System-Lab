@@ -10,6 +10,7 @@ import threading
 BUFFER_SIZE = 4096
 SEPARATOR = "<SEPARATOR>"
 
+
 class Error:
     commandInputError = Exception("Please enter correct command")
     portInputError = Exception("Please enter correct port number")
@@ -18,12 +19,10 @@ class Error:
 
 
 class Client:
-    def __init__(self, host, port, id):
-        self.id = id
+    def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.connections = []
-        self.weight = ""
+        self.flag = 0
 
     def createSocket(self, port):
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,7 +34,29 @@ class Client:
 
     def encode(self, value):
         return value.encode('ascii')
-    
+
+    def listen(self, client):
+        while True:
+            data = client.recv(1024)
+            if not data:
+                break
+            print(self.decode(data))
+        client.close()
+        exit(0)
+
+    def send(self, client):
+        while True:
+            message = input("")
+            self.flag += 1
+            if(message == "./leave"):
+                break
+            client.send(self.encode(message))
+
+        client.send(self.encode(message))
+        self.flag += 1
+        client.close()
+        exit(0)
+
     def rec_file(self, client):
         received = client.recv(BUFFER_SIZE).decode()
         filename, filesize = received.split(SEPARATOR)
@@ -45,13 +66,14 @@ class Client:
         filesize = int(filesize)
         # start receiving the file from the socket
         # and writing to the file stream
-        progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+        progress = tqdm.tqdm(range(
+            filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         with open(filename, "wb") as f:
             while True:
                 # read 1024 bytes from the socket (receive)
                 bytes_read = client.recv(BUFFER_SIZE)
-                if not bytes_read:    
-                    # nothing is received
+                if not bytes_read:
+                    # nothing is receivedc vb b+
                     # file transmitting is done
                     break
             # write to the file the bytes we just received
@@ -59,23 +81,52 @@ class Client:
             # update the progress bar
         progress.update(len(bytes_read))
 
-    def listen(self, client):
-        while True:
-            data = client.recv(1024)
-            data = self.decode(data)
-            message = data[:data.find('(')]
-            if(message == "B"):
-                self.weight = data[data.find('(')+1:data.find(')')]
-                print("Assigned Weight to Process {} is: {}".format(
-                    self.id, self.weight))
-                time.sleep(random.randint(1, 20))
-                client.send(self.encode("C({})".format(self.weight)))
-        client.close()
-        exit(0)
+    def joinChatRoom(self, port):
+        try:
+            client = self.createSocket(port)
+            name = input("Enter Name : ")
+            client.send(name.encode('ascii'))
+            _thread.start_new_thread(self.listen, (client,))
+            _thread.start_new_thread(self.send, (client,))
+            while True:
+                continue
+        except Exception as e:
+            print(e)
+            self.joinChatRoom(port+1)
 
     def start(self):
         client = self.createSocket(self.port)
-    # _thread.start_new_thread(self.send, (client,))
-        _thread.start_new_thread(self.listen, (client,))
         while True:
-            continue
+            try:
+                command = input("Enter command : ")
+                if(command == "./join"):
+                    port = input("Enter port of 5 digits: ")
+                    assert(len(port) == 5)
+                    client.close()
+                    self.joinChatRoom(int(port))
+                    break
+                elif(command == "./createRoom"):
+                    client.send(self.encode(command))
+                    reply = client.recv(1024)
+                    if not reply:
+                        raise Error.controllerError
+                        continue
+                    result = json.loads(str(self.decode(reply)))
+                    if(result["status"] == 200):
+                        if(result["type"] == "creation"):
+                            client.close()
+                            print(result["message"])
+                            self.joinChatRoom(result["port"])
+                            break
+                    else:
+                        raise Error.createRoomError
+                else:
+                    raise Error.commandInputError
+            except Exception as e:
+                print(e)
+                continue
+
+
+if __name__ == '__main__':
+    client = Client('127.0.0.1', 12343)
+    client.start()

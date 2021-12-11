@@ -49,25 +49,6 @@ class Server:
                 if data == "./members":
                     client.send(self.encode(str(self.members)))
                     continue
-                # Doesn't work as of now
-                # if data.find("./kick")>=0:
-                #     print(client_addr,self.admin)
-                #     if(client_addr==self.admin):
-                #         index = str(self.decode(data)).find(":")
-                #         name = data[index+1:]
-                #         print(name)
-                #         try:
-                #             self.connection[self.members.find(name)].close()
-                #             del self.connection[self.members.find(name)]
-                #             continue
-                #         except :
-                #             client.send(self.encode("No such user exists"))
-                #             continue
-
-                #     else:
-                #         client.send(self.encode("You are not authorized to use this command"))
-                #         continue
-
                 message = "{} : {}".format(client_name, data)
                 self.flags[self.members.index(client_name)] += 1
                 self.broadcast(client, message)
