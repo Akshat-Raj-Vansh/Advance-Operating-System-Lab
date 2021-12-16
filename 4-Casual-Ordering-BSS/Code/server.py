@@ -2,6 +2,7 @@ import socket as socket
 import _thread
 import threading
 
+
 class Server:
     def __init__(self, port, admin, host="",):
         self.admin = admin

