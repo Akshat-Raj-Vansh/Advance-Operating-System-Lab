@@ -7,6 +7,11 @@ def logical_number(spno, seno, rpno, reno):
         P[rpno][reno] = P[spno][seno]+1
 
 
+def update(process_num, event_number_1, event_number_2):
+    if(P[process_num][event_number_1] > P[process_num][event_number_2]):
+        P[process_num][event_number_2] = P[process_num][event_number_1]+1
+
+
 P = {1: {}, 2: {}, 3: {}}
 
 inc = 0
@@ -44,9 +49,13 @@ while inc < comm:
             recv_event_no, recv, P[recv][recv_event_no]))
     else:
         print("Enter the sent/recv within existing process")
+    if (recv_event_no + 1) in P[recv]:
+        for i in range(recv_event_no + 1, len(P[recv]) + 1):
+            P[recv][i] = update(recv, i-1, i)
     inc += 1
 
 print("Final vectors of the 3 process are")
 print(P[1])
 print(P[2])
 print(P[3])
+timeout = input('')
