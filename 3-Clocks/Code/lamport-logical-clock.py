@@ -1,15 +1,12 @@
 def logical_number(spno, seno, rpno, reno):
-    if(seno != 1):
-        P[spno][seno] = P[spno][seno-1]+1
-    if(reno != 1):
-        P[rpno][reno] = max(P[rpno][reno-1], P[spno][seno])+1
+    if(reno > 1):
+        P[rpno-1][reno-1] = max(P[rpno-1][reno-2],P[spno-1][seno-1]+1)
     else:
-        P[rpno][reno] = P[spno][seno]+1
+        P[rpno-1][reno-1] = P[spno-1][seno-1]+1
 
 
 def update(process_num, event_number_1, event_number_2):
-    if(P[process_num][event_number_1] > P[process_num][event_number_2]):
-        P[process_num][event_number_2] = P[process_num][event_number_1]+1
+    P[process_num][event_number_2] = max(P[process_num][event_number_1]+1,P[process_num][event_number_2])
 
 
 P = {1: {}, 2: {}, 3: {}}
@@ -45,13 +42,12 @@ while inc < comm:
     if sent <= 3 and recv <= 3:
         print("P{} --> P{}".format(sent, recv))
         logical_number(sent, sent_event_no, recv, recv_event_no)
-        print("New vector value of \"event {}\"  in process P{} is : {} \n".format(
-            recv_event_no, recv, P[recv][recv_event_no]))
     else:
         print("Enter the sent/recv within existing process")
+    
     if (recv_event_no + 1) in P[recv]:
-        for i in range(recv_event_no + 1, len(P[recv]) + 1):
-            P[recv][i] = update(recv, i-1, i)
+        for i in range(recv_event_no, len(P[recv-1])):
+            P[recv-1][i] = update(recv-1, i-1, i)
     inc += 1
 
 print("Final vectors of the 3 process are")
